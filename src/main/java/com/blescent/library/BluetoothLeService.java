@@ -43,7 +43,8 @@ public class BluetoothLeService extends Service{
     private BluetoothAdapter mBluetoothAdapter;
     private String mBluetoothDeviceAddress;
     private BluetoothGatt mBluetoothGatt;
-    private int mConnectionState = STATE_DISCONNECTED;
+
+    private static int mConnectionState = STATE_DISCONNECTED;
 
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
@@ -449,7 +450,7 @@ public class BluetoothLeService extends Service{
                 String majorVersionString = components[0];
                 String minorVersionString = components[1];
                 byte majorVersion = Byte.valueOf(majorVersionString);
-                byte minorVersion = Byte.valueOf(majorVersionString);
+                byte minorVersion = Byte.valueOf(minorVersionString);
                 firmwareRevision = (byte) ((majorVersion << 4) | minorVersion);
             } else {
                 Log.d(TAG, "Couldn't parse firmware version.");
@@ -899,7 +900,13 @@ public class BluetoothLeService extends Service{
     }
 
     public boolean isCharacteristicsPresent() {
-        return mBluetoothGatt.getService(kOPhoneServiceUUID).getCharacteristic(kOPhoneTXCharacteristicUUID) != null;
+        if(mBluetoothGatt!=null){
+            BluetoothGattService localService = mBluetoothGatt.getService(kOPhoneServiceUUID);
+            if(localService!=null){
+                return localService.getCharacteristic(kOPhoneTXCharacteristicUUID)!=null;
+            }
+        }
+        return false;
     }
 
 
@@ -925,5 +932,11 @@ public class BluetoothLeService extends Service{
         return mBluetoothAdapter != null && mBluetoothAdapter.isEnabled();
     }
 
+    public static int getmConnectionState() {
+        return mConnectionState;
+    }
 
+    public static void setmConnectionState(int mConnectionState) {
+        BluetoothLeService.mConnectionState = mConnectionState;
+    }
 }
