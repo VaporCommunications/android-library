@@ -44,11 +44,12 @@ public class BluetoothLeService extends Service{
     private String mBluetoothDeviceAddress;
     private BluetoothGatt mBluetoothGatt;
 
-    private static int mConnectionState = STATE_DISCONNECTED;
 
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
     private static final int STATE_CONNECTED = 2;
+
+    private static int mConnectionState = STATE_DISCONNECTED;
 
     public final static String ACTION_GATT_CONNECTED =
             "com.demo.bluetooth.le.ACTION_GATT_CONNECTED";
@@ -505,7 +506,7 @@ public class BluetoothLeService extends Service{
         // After using a given device, you should make sure that BluetoothGatt.close() is called
         // such that resources are cleaned up properly.  In this particular example, close() is
         // invoked when the UI is disconnected from the Service.
-        close();
+       // close();
         return super.onUnbind(intent);
     }
 
@@ -855,7 +856,9 @@ public class BluetoothLeService extends Service{
                     }
                     handler.postDelayed(this,100);
                 }else{
-                    queueData.remove();
+                    if(queueData.size()!=0){
+                        queueData.remove();
+                    }
                     Log.d(TAG,"work completed");
                     handler.removeCallbacks(this);
                     runQueueIfNecessary();
@@ -938,5 +941,8 @@ public class BluetoothLeService extends Service{
 
     public static void setmConnectionState(int mConnectionState) {
         BluetoothLeService.mConnectionState = mConnectionState;
+    }
+    public static byte getFirmwareRevision() {
+        return firmwareRevision;
     }
 }
