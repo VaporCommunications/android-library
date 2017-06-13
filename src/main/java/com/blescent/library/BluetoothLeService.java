@@ -109,6 +109,8 @@ public class BluetoothLeService extends Service{
         OPBTPeripheralBatteryLevelKey,
         OPBTPeripheralHasOfflineAnalyticsKey,
         OPBTPeripheralStoredTrackKey,
+        OPBTPeripheralRFIDValidKey,
+        OPBTPeripheralRFIDDeviceTypeKey,
         OPBTPeripheralRFIDFamilyKey,
         OPBTPeripheralRFIDIdentifierKey,
         OPBTPeripheralRFIDTrackKey,
@@ -360,16 +362,41 @@ public class BluetoothLeService extends Service{
             sendBroadcast(intent);
         } else if (opcode == 5) {
             position = 0;
+            byte valid = 0;
+            if (read8BitValue(payload.length, position)) {
+                valid =  payload[position];
+                position++;
+            }else{
+                return VPBTResponseStatusInvalid;
+            }
+
+            // Read the rfId version tag
+            byte rfIdVersion = 0;
+            if(read8BitValue(payload.length, position)){
+                rfIdVersion = payload[position];
+                position++;
+            } else {
+                return VPBTResponseStatusInvalid;
+            }
+
+            // Read the device type (e.g. 1 = Cyrano)
+            byte deviceType = 0;
+            if(read8BitValue(payload.length,position)){
+                deviceType = payload[position];
+                position++;
+            } else {
+                return VPBTResponseStatusInvalid;
+            }
             short familyCode;
             if (read16BitValue(payload.length, position)) {
-                familyCode = (short) ((payload[position + 1] << 8) + (response[position] & 0xFF));
+                familyCode = (short) ((payload[position + 1] << 8) + (payload[position] & 0xFF));
                 position = position + 2;
             } else {
                 return VPBTResponseStatusInvalid;
             }
             short identifierLength;
             if (read16BitValue(payload.length, position)) {
-                identifierLength = (short) ((payload[position + 1] << 8) + (response[position] & 0xFF));
+                identifierLength = (short) ((payload[position + 1] << 8) + (payload[position] & 0xFF));
                 position = position + 2;
             } else {
                 return VPBTResponseStatusInvalid;
@@ -377,7 +404,7 @@ public class BluetoothLeService extends Service{
             byte[] identifierData = Arrays.copyOfRange(payload, position, position + identifierLength);
             position += identifierLength;
             String identifierString = new String(identifierData, StandardCharsets.UTF_8);
-            short trackLength;
+            /*short trackLength;
             if (read16BitValue(payload.length, position)) {
                 trackLength = (short) ((payload[position + 1] << 8) + (response[position] & 0xFF));
                 position = position + 2;
@@ -385,12 +412,14 @@ public class BluetoothLeService extends Service{
                 return VPBTResponseStatusInvalid;
             }
             byte[] trackData = Arrays.copyOfRange(payload, position, position + trackLength);
-            position += trackLength;
+            position += trackLength;*/
             Intent intent = new Intent(notification.OPBTPeripheralRFIDReadNotification.name());
             intent.putExtra(Key.OPBTPeripheralRFIDFamilyKey.name(), familyCode);
             intent.putExtra(Key.OPBTPeripheralRFIDIdentifierKey.name(), identifierData);
-            intent.putExtra(Key.OPBTPeripheralRFIDTrackKey.name(), trackData);
-            Log.d(TAG,">>>>> RFIDRead:" + familyCode+", "+byteArrayToString(identifierData)+", "+byteArrayToString(trackData));
+           // intent.putExtra(Key.OPBTPeripheralRFIDTrackKey.name(), trackData);
+            intent.putExtra(Key.OPBTPeripheralRFIDDeviceTypeKey.name(),deviceType);
+            intent.putExtra(Key.OPBTPeripheralRFIDValidKey.name(),valid);
+            Log.d(TAG,">>>>> RFIDRead:"+valid+", "+rfIdVersion+", "+deviceType+", " + familyCode+", "+byteArrayToString(identifierData)+", ");
             sendBroadcast(intent);
 
         }else if(opcode == 8){
@@ -398,9 +427,9 @@ public class BluetoothLeService extends Service{
             intent.putExtra(Key.OPBTPeripheralOfflineAnalyticsKey.name(),payload);
             sendBroadcast(intent);
         }
-        Intent intent = new Intent("PARSE_RESPONSE");
+        /*Intent intent = new Intent("PARSE_RESPONSE");
         intent.putExtra("RESPONSE",response);
-        sendBroadcast(intent);
+        sendBroadcast(intent);*/
         return VPBTResponseStatusValid;
     }
 
