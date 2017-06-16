@@ -340,6 +340,7 @@ public class BluetoothLeService extends Service{
             return VPBTResponseStatusInvalid;
         }
 
+        this.firmwareRevision = firmwareRevision;
         Log.d(TAG, "parseResponse" + headerByte1 + " " + headerByte2 + " " + firmwareRevision + " " + responseStatus + " " + opcode + " " + payloadLength);
         if (opcode == 2) {
             int value = ((int) payload[0]) & 0xff;
@@ -812,16 +813,26 @@ public class BluetoothLeService extends Service{
         }
     }
 
-    public void writeSettingsWithFanSpeed(int fanSpeedPercentage, boolean isTimeoutOn, int timeoutMinutes) {
+    public void writeSettingsWithFanSpeed(int fanSpeedPercentage, boolean isTimeoutOn, int timeoutMinutes,boolean isAutoPlayOn,int autoPlaySeconds) {
         if (firmwareRevision < 0x20) {
             Log.d(TAG, "Legacy code can't enable timeout on device.");
         } else {
-            byte[] payload = new byte[4];
+            byte[] payload;
+            if(firmwareRevision>=0x26)
+                payload= new byte[7];
+            else{
+                payload= new byte[4];
+            }
             byte timeoutOn = (byte) (isTimeoutOn ? 0x01 : 0x00);
             payload[0] = (byte) fanSpeedPercentage;
             payload[1] = timeoutOn;
             payload[2] = (byte) (timeoutMinutes & 0xff);
             payload[3] = (byte) ((timeoutMinutes >> 8) & 0xff);
+            if (firmwareRevision >= 0x26) {
+                payload[4] = (byte) (isAutoPlayOn ? 0x01 : 0x00);
+                payload[5] = (byte) (autoPlaySeconds & 0xff);
+                payload[6] = (byte) ((autoPlaySeconds >> 8) & 0xff);
+            }
             byte[] finalBytes = packCommand((byte) 7, payload);
             enqueueData(finalBytes,true);
         }
