@@ -9,11 +9,13 @@ public class QueueData {
     private byte[] payload;
     private boolean waitForResponse;
     private BluetoothGattCharacteristic characteristic;
+  //  private boolean stillProcessing;
 
     QueueData(byte[] payload,boolean waitForResponse,BluetoothGattCharacteristic characteristic){
         this.payload = payload;
         this.waitForResponse = waitForResponse;
         this.characteristic = characteristic;
+       // this.stillProcessing = true;
     }
     public byte[] getPayload() {
         return payload;
@@ -38,4 +40,12 @@ public class QueueData {
     public void setCharacteristic(BluetoothGattCharacteristic characteristic) {
         this.characteristic = characteristic;
     }
+
+  /*  public boolean isStillProcessing() {
+        return stillProcessing;
+    }
+
+    public void setStillProcessing(boolean stillProcessing) {
+        this.stillProcessing = stillProcessing;
+    }*/
 }

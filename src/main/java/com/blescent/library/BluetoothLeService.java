@@ -17,6 +17,7 @@ import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.util.Log;
 import android.widget.Toast;
@@ -73,7 +74,6 @@ public class BluetoothLeService extends Service{
     private static final int VPBTResponseStatusValid = 2;
     private static byte firmwareRevision = 0;
     private static final byte VPHeartbeatCharacter = 'W';
-    private static boolean stillProcessing = false;
     private static ArrayList<Byte> responseArrayList = new ArrayList<>();
     private static Queue<QueueData> queueData = new LinkedList<QueueData>();
     private static boolean processing=false;
@@ -82,6 +82,7 @@ public class BluetoothLeService extends Service{
     private static int VPMaxNumberOfRetries = 3;
     private static long commandStartTime;
     private static int retryCount;
+   // private QueueData currentWriteOp;
 
     public enum notification {
         OPBTPeripheralConnectedNotification,
@@ -98,7 +99,9 @@ public class BluetoothLeService extends Service{
         OPBTPeripheralOfflineAnalyticsReadNotification,
         OPBTPeripheralCommunicationErrorNotification,
         OPBTPeripheralBluetoothDataLogNotification,
-        OPBTPeripheralFirmwareRevisionNotification
+        OPBTPeripheralFirmwareRevisionNotification,
+        OPBTPeripheralPlayScentNotification,
+        OPBTPeripheralStopScentNotification
     }
 
     public enum Key {
@@ -225,11 +228,20 @@ public class BluetoothLeService extends Service{
                 if (firstNonHeartbeatByte > 0) {
                     broadcastUpdate(notification.OPBTPeripheralHeartbeatNotification.name());
                 }
+
                 byte[] dataWithoutHeartbeats = Arrays.copyOfRange(bytes, firstNonHeartbeatByte, bytes.length);
 
-                if (dataWithoutHeartbeats.length > 0 && waitForResponse) {
-                    didUpdateValueWithData(dataWithoutHeartbeats);
-                }
+                /*QueueData writeOp = currentWriteOp;
+                if(!writeOp.isStillProcessing()){
+                    currentWriteOp = null;
+                }*/
+            //    if(writeOp.isWaitForResponse()) {
+                    if (dataWithoutHeartbeats.length > 0 && waitForResponse) {
+                        if (didUpdateValueWithData(dataWithoutHeartbeats)) {
+                            //currentWriteOp = null;
+                        }
+                    }
+               // }
             }
         }
 
@@ -254,8 +266,8 @@ public class BluetoothLeService extends Service{
         int status = parseResponse();
         if (status != VPBTResponseStatusIncomplete) {
             responseArrayList.clear();
-            processing = false;
             if (status == VPBTResponseStatusValid) {
+                processing = false;
                 return true;
             } else {
                 // There was a with the response; resend the command
@@ -339,10 +351,14 @@ public class BluetoothLeService extends Service{
             broadcastUpdate(notification.OPBTPeripheralCommunicationErrorNotification.name(), "Invalid checksum.");
             return VPBTResponseStatusInvalid;
         }
-
-        this.firmwareRevision = firmwareRevision;
+        if(BluetoothLeService.firmwareRevision == 0x00)
+            BluetoothLeService.firmwareRevision = firmwareRevision;
         Log.d(TAG, "parseResponse" + headerByte1 + " " + headerByte2 + " " + firmwareRevision + " " + responseStatus + " " + opcode + " " + payloadLength);
-        if (opcode == 2) {
+       if(opcode == 0){
+           broadcastUpdate(notification.OPBTPeripheralPlayScentNotification.name());
+       }else if(opcode ==1){
+           broadcastUpdate(notification.OPBTPeripheralStopScentNotification.name());
+       }else if (opcode == 2) {
             int value = ((int) payload[0]) & 0xff;
             byte state = payload[1];
             byte hasOfflineAnalytics = payload[2];
@@ -475,8 +491,17 @@ public class BluetoothLeService extends Service{
         if ("Firmware Revision".equals(stringFromData)) {
             firmwareRevision = 0x15;
         } else if (stringFromData.contains("Revision")) {
-            String version = stringFromData.replace("Revision ", "");
-            String components[] = version.split(".");
+            firmwareRevision = 0x00;
+            (new Handler (Looper.getMainLooper ())).postDelayed (new Runnable ()
+            {
+                @Override
+                public void run ()
+                {
+                    queryNonLegacyFirmwareForVersion();
+                }
+            },1000);
+            /*String version = stringFromData.replace("Revision ", "");
+            String components[] = version.split("\\.");
             if (components.length == 2) {
                 String majorVersionString = components[0];
                 String minorVersionString = components[1];
@@ -494,12 +519,12 @@ public class BluetoothLeService extends Service{
             if (firmwareRevision == 0) {
                 Log.d(TAG, "!!  Invalid firmware revision, reading it via querying.");
                 disconnect();
-            }
+            }*/
         } else {
             // oPhones end up here
             firmwareRevision = 0x15;
         }
-        broadcastUpdate(notification.OPBTPeripheralFirmwareRevisionNotification.name());
+       // broadcastUpdate(notification.OPBTPeripheralFirmwareRevisionNotification.name());
         Log.e(TAG, "firmwareRevision=" + firmwareRevision);
     }
 
@@ -755,6 +780,10 @@ public class BluetoothLeService extends Service{
             transmitDataWithoutPayloadToCommand((byte) 2);
     }
 
+    public void queryNonLegacyFirmwareForVersion(){
+        transmitDataWithoutPayloadToCommand((byte) 2);
+    }
+
     public void writeTrackPayload(byte[] payload) {
         if (firmwareRevision < 0x20) {
             Log.d(TAG, "Legacy code can't write track.");
@@ -874,6 +903,7 @@ public class BluetoothLeService extends Service{
 
     private void actualMain(){
         retryCount = 0;
+//        currentWriteOp = queueData.element();
         send();
         Log.d(TAG,"actual main");
         final Handler handler = new Handler();
